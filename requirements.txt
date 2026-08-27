@@ -1,0 +1,33 @@
+# Las versiones están acotadas a propósito: este repo vive en la
+# descripción de un video y no se tiene que romper solo cuando salga
+# la próxima versión mayor de LangChain.
+
+# --- LangChain + LangGraph -------------------------------------------------
+# LangGraph es lo que le da la memoria al agente y lo que después nos deja
+# enchufarlo a Telegram o WhatsApp sin reescribir el agente.
+langchain-core>=1.5,<2
+langgraph>=1.2,<2
+langgraph-checkpoint>=4.1,<5
+langgraph-checkpoint-sqlite>=3.1,<4   # la memoria de MODO=test
+
+# --- Proveedores de modelos ------------------------------------------------
+# Podés borrar los que no vayas a usar.
+langchain-anthropic>=1.5,<2     # Claude
+langchain-openai>=1.4,<2         # OpenAI
+langchain-google-genai>=4.3,<5   # Gemini
+
+# --- Plataforma de pruebas (la web local) ----------------------------------
+fastapi>=0.115,<1
+uvicorn>=0.30,<1
+python-dotenv>=1.0,<2
+
+# --- Solo para MODO=produccion ---------------------------------------------
+# Descomentá estas dos líneas cuando pases a Postgres.
+#
+# Ojo con la versión: la serie 2.x arrastra un langgraph-checkpoint viejo que
+# se pelea con el langgraph de arriba. Tiene que ser 3.x.
+#
+# Y psycopg va con [binary] sí o sí en Windows: sin eso el import falla con
+# "no pq wrapper available" porque falta la libpq del sistema.
+# langgraph-checkpoint-postgres>=3.1,<4
+# psycopg[binary]>=3.2,<4

@@ -1,0 +1,27 @@
+# Nada de esto tiene que entrar a la imagen.
+#
+# Lo primero es lo importante: el .env se queda afuera SIEMPRE. En el
+# servidor las variables las pone Coolify; una imagen con las claves
+# adentro es una imagen que no se puede compartir nunca más.
+.env
+.env.*
+*.key
+
+# El entorno virtual de tu máquina: son binarios de Windows, adentro de un
+# contenedor Linux no sirven para nada.
+.venv/
+venv/
+
+# Las conversaciones de MODO=test. En el servidor la memoria va a Postgres.
+datos/
+*.db
+*.sqlite3
+
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+.git/
+.gitignore
+tests/
+*.md

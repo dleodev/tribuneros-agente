@@ -1,0 +1,41 @@
+# Credenciales — NUNCA se suben
+.env
+.env.local
+.env.*.local
+*.key
+credenciales*.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+ENV/
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Editores
+.vscode/
+.idea/
+*.swp
+.DS_Store
+Thumbs.db
+
+# Logs y temporales
+*.log
+tmp/
+temp/
+
+# Base de datos local de conversaciones (MODO=test)
+datos/
+*.db
+*.sqlite3
+_vista-previa.html
