@@ -25,6 +25,7 @@ from ..config import (
 )
 from ..modelos import listar_modelos, olvidar_modelos
 from ..prompts import guardar_prompt, leer_prompt
+from . import publicar_prompt
 
 ESTATICOS = Path(__file__).parent / "static"
 
@@ -139,7 +140,11 @@ def modelos(proveedor: str, refrescar: bool = False) -> dict:
 @app.get("/api/prompt")
 def obtener_prompt() -> dict:
     ruta = _ruta_prompt()
-    return {"texto": leer_prompt(ruta), "ruta": str(ruta)}
+    return {
+        "texto": leer_prompt(ruta),
+        "ruta": str(ruta),
+        "publicar_disponible": publicar_prompt.disponible(),
+    }
 
 
 @app.post("/api/prompt")
@@ -148,6 +153,16 @@ def escribir_prompt(entrada: PromptEntrante) -> dict:
     guardar_prompt(ruta, entrada.texto)
     # No hace falta reiniciar nada: el prompt se relee en cada mensaje.
     return {"ok": True, "ruta": str(ruta)}
+
+
+@app.post("/api/prompt/publicar")
+def publicar_prompt_de_verdad(entrada: PromptEntrante) -> dict:
+    """A diferencia de /api/prompt, esto sí llega al WhatsApp real (ver publicar_prompt.py)."""
+    try:
+        info = publicar_prompt.publicar(entrada.texto)
+    except publicar_prompt.ErrorDePublicacion as e:
+        return {"ok": False, "error": str(e)}
+    return {"ok": True, **info}
 
 
 @app.post("/api/ajustes")

@@ -1,0 +1,38 @@
+# La plataforma de pruebas, en la nube.
+#
+# Es la misma plataforma de "python servidor.py" que corre en tu compu, pero
+# empaquetada para un contenedor: escucha en 0.0.0.0 y lee el puerto de una
+# variable de entorno (ver servidor_nube.py). No es el webhook de WhatsApp
+# (ese usa el Dockerfile de la raíz) — acá se prueba, ahí se atiende de
+# verdad. El puente entre las dos es el botón "Guardar definitivo" del editor
+# de prompt (ver src/agente/web/publicar_prompt.py).
+#
+# MODO=test alcanza para esto: es una plataforma de ensayo, no hace falta que
+# la conversación sobreviva a un redeploy.
+
+FROM python:3.13-slim
+
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONIOENCODING=utf-8
+
+WORKDIR /app
+
+# curl es para el health check del panel (ver el Dockerfile de la raíz).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY requirements.txt ./
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY src/ ./src/
+COPY prompts/ ./prompts/
+COPY servidor_nube.py ./
+
+RUN useradd --create-home agente && chown -R agente:agente /app
+USER agente
+
+ENV PUERTO=8000
+EXPOSE 8000
+
+CMD ["python", "servidor_nube.py"]
