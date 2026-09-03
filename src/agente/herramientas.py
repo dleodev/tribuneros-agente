@@ -365,6 +365,43 @@ def _tiendanube_pedir(ruta: str, parametros: dict) -> list | dict:
 # la tienda real: "argentna" (falta una i) tiene que encontrar "argentina".
 UMBRAL_DE_PARECIDO = 0.72
 
+# Conectores que no dicen nada de qué producto se busca. Se sacan de la
+# consulta antes de puntuar: se probó a mano que "camiseta de boca" sin este
+# filtro perdía a la Titular 26/27 por culpa del "de" solo, que no matchea
+# nada y diluye el promedio.
+PALABRAS_VACIAS = {
+    "de",
+    "la",
+    "el",
+    "los",
+    "las",
+    "un",
+    "una",
+    "unos",
+    "unas",
+    "que",
+    "con",
+    "para",
+    "por",
+    "y",
+    "o",
+    "del",
+    "al",
+    "en",
+    "me",
+    "tenes",
+    "tienen",
+    "hay",
+    "busco",
+    "buscando",
+    "quiero",
+    "queria",
+    "necesito",
+    "estoy",
+    "esta",
+    "este",
+}
+
 
 def _catalogo_completo() -> list[dict]:
     """Todos los productos publicados, en un solo pedido.
@@ -377,17 +414,54 @@ def _catalogo_completo() -> list[dict]:
     return _tiendanube_pedir("/products", {"per_page": 100, "published": "true"})
 
 
-def _buscar_en_catalogo(consulta: str, maximo: int = 5) -> list[dict]:
-    """Los productos del catálogo que mejor matchean la consulta, ordenados."""
-    catalogo = _catalogo_completo()
+def _buscar_en_catalogo(consulta: str, maximo: int = 6) -> list[dict]:
+    """Los productos del catálogo que mejor matchean la consulta, ordenados.
 
-    puntuados = [(_puntaje(consulta, p), p) for p in catalogo]
-    puntuados.sort(key=lambda par: par[0], reverse=True)
+    Con una consulta genérica ("camiseta de boca", sin decir cuál) es normal
+    que varios productos empaten en puntaje — ahí el desempate es a favor
+    del que tiene stock, para no gastar uno de los pocos lugares del top en
+    algo que la persona no puede comprar todavía.
+    """
+    catalogo = _catalogo_completo()
+    frecuencia, total = _frecuencia_de_palabras(catalogo)
+
+    puntuados = [(_puntaje(consulta, p, frecuencia, total), p) for p in catalogo]
+    puntuados.sort(key=lambda par: (par[0], bool(par[1].get("has_stock"))), reverse=True)
 
     return [p for puntaje, p in puntuados if puntaje >= UMBRAL_DE_PARECIDO][:maximo]
 
 
-def _puntaje(consulta: str, producto: dict) -> float:
+def _palabras_del_producto(producto: dict) -> list[str]:
+    nombre = (producto.get("name") or {}).get("es") or ""
+    etiquetas = producto.get("tags") or ""
+    marca = producto.get("brand") or ""
+    return _normalizar(f"{nombre} {etiquetas} {marca}").split()
+
+
+def _frecuencia_de_palabras(catalogo: list[dict]) -> tuple[dict[str, int], int]:
+    """En cuántos productos aparece cada palabra. Sirve para bajarle el peso
+    a las genéricas (ver el comentario largo en _puntaje)."""
+    frecuencia: dict[str, int] = {}
+    for p in catalogo:
+        for palabra in set(_palabras_del_producto(p)):
+            frecuencia[palabra] = frecuencia.get(palabra, 0) + 1
+    return frecuencia, len(catalogo)
+
+
+def _rareza(palabra: str, frecuencia: dict[str, int], total: int) -> float:
+    """1.0 = palabra rara (buena para diferenciar), cerca de 0 = casi universal."""
+    if total == 0:
+        return 1.0
+    # No hace falta que la palabra de la consulta sea idéntica a una del
+    # catálogo para contarla como "vista": alcanza con que se parezca mucho.
+    veces = max(
+        (freq for vocablo, freq in frecuencia.items() if difflib.SequenceMatcher(None, palabra, vocablo).ratio() > 0.85),
+        default=0,
+    )
+    return 1 - min(veces / total, 0.9)
+
+
+def _puntaje(consulta: str, producto: dict, frecuencia: dict[str, int], total: int) -> float:
     """Qué tan bien matchea la consulta con este producto, de 0 a 1.
 
     Compara palabra por palabra (no la frase entera contra el texto entero):
@@ -395,32 +469,46 @@ def _puntaje(consulta: str, producto: dict) -> float:
     nombre real tenga de por medio "2026" y "(Versión Jugador)" que la
     consulta no mencionó.
 
-    Mezcla el promedio con el mejor puntaje individual, no usa solo el
-    promedio. Motivo real, no teórico: varios productos del catálogo (los de
-    River, por ejemplo) no tienen ninguna etiqueta cargada, así que la
-    palabra "camiseta" no matchea nada de ese producto — con el promedio
-    solo, "camista river" se hundía por esa palabra suelta aunque "river"
-    matcheara perfecto. El máximo evita que una palabra sin dónde pegar tape
-    a otra que sí encontró justo lo que había que encontrar.
+    Cada palabra de la consulta pesa según qué tan rara es en el catálogo.
+    Motivo real, no teórico: "camiseta" aparece en casi la mitad de los
+    nombres (unos sí, otros no — "Camiseta Boca Juniors 25 Aniversario" pero
+    también "Boca Juniors - Titular 26/27", sin la palabra) y sin este ajuste
+    "camiseta de boca" armaba un empate perfecto con cualquier producto que
+    tuviera la palabra "Camiseta" en el nombre, tapando a la Titular 26/27
+    —que sí era la respuesta correcta— fuera del top 5. Una palabra rara
+    (un equipo, un año, "aniversario") tiene que pesar mucho más que una que
+    está en medio catálogo.
     """
-    nombre = (producto.get("name") or {}).get("es") or ""
-    etiquetas = producto.get("tags") or ""
-    marca = producto.get("brand") or ""
-    palabras_producto = _normalizar(f"{nombre} {etiquetas} {marca}").split()
-    palabras_consulta = _normalizar(consulta).split()
+    palabras_producto = _palabras_del_producto(producto)
+    palabras_consulta = [
+        p for p in _normalizar(consulta).split() if p not in PALABRAS_VACIAS
+    ]
 
     if not palabras_consulta or not palabras_producto:
         return 0.0
 
-    puntajes = [
-        max(
+    pares = []
+    for palabra in palabras_consulta:
+        similitud = max(
             difflib.SequenceMatcher(None, palabra, otra).ratio()
             for otra in palabras_producto
         )
-        for palabra in palabras_consulta
-    ]
-    promedio = sum(puntajes) / len(puntajes)
-    return (promedio + max(puntajes)) / 2
+        pares.append((similitud, _rareza(palabra, frecuencia, total)))
+
+    suma_pesos = sum(peso for _, peso in pares)
+    if suma_pesos > 0:
+        promedio = sum(s * peso for s, peso in pares) / suma_pesos
+    else:
+        # Las palabras de la consulta son todas genéricas (ninguna rareza):
+        # ahí el peso no aporta nada y se cae a un promedio simple.
+        promedio = sum(s for s, _ in pares) / len(pares)
+
+    # El "mejor individual" también lleva su peso — si no, una sola palabra
+    # genérica con match perfecto (como "camiseta" sola) volvería a colarse
+    # por acá, que es justo el problema que este cambio soluciona.
+    mejor = max(s * (0.5 + 0.5 * peso) for s, peso in pares)
+
+    return (promedio + mejor) / 2
 
 
 def _describir_producto(p: dict) -> str:
@@ -457,10 +545,6 @@ def _talle(variante: dict) -> str:
 
 def _buscar_alternativas(producto: dict, maximo: int = 3) -> list[str]:
     """Otros productos con stock, parecidos por nombre, etiquetas o marca."""
-    nombre = (producto.get("name") or {}).get("es") or ""
-    etiquetas = producto.get("tags") or ""
-    marca = producto.get("brand") or ""
-
     try:
         catalogo = _catalogo_completo()
     except Exception:
@@ -468,13 +552,16 @@ def _buscar_alternativas(producto: dict, maximo: int = 3) -> list[str]:
         # respuesta principal: el producto original ya se informó bien.
         return []
 
+    frecuencia, total = _frecuencia_de_palabras(catalogo)
+    consulta = " ".join(_palabras_del_producto(producto))
+
     candidatos = [
         c
         for c in catalogo
         if c.get("id") != producto.get("id") and c.get("has_stock")
     ]
     puntuados = [
-        (_puntaje(f"{nombre} {etiquetas} {marca}", c), c) for c in candidatos
+        (_puntaje(consulta, c, frecuencia, total), c) for c in candidatos
     ]
     puntuados.sort(key=lambda par: par[0], reverse=True)
 
