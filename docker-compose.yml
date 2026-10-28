@@ -5,7 +5,8 @@
 #             por cada app).
 #   agente    El webhook que atiende WhatsApp (webhook_chatwoot.py).
 #   pruebas   La plataforma de pruebas, con usuario y clave (servidor_nube.py).
-#   respaldo  Copia diaria de la base a un almacenamiento EXTERNO al servidor.
+#   (respaldo) Copia diaria a un bucket externo: está APARTE, en
+#             docker-compose.respaldo.yml, y hoy no se despliega.
 #
 # Chatwoot NO está acá: va como servicio de un clic de Coolify, que ya trae su
 # propio Postgres y Redis (y su propio backup, que se configura en Coolify).
@@ -25,9 +26,8 @@
 #        agente   →  https://agente.tribuneros.store:8000
 #        pruebas  →  https://prompt.tribuneros.store:8000
 #   6. Deploy automático: webhook del repo en GitHub (Coolify muestra la URL).
-#   7. Si hay un respaldo, recuperar los datos (la base se pisa por completo):
-#        docker exec <contenedor-respaldo> sh restore.sh
-#      Sin argumentos restaura el último; con un timestamp, uno puntual.
+#   7. Respaldo (opcional, ver docker-compose.respaldo.yml): si existe uno,
+#      recuperar los datos con `docker exec <contenedor-respaldo> sh restore.sh`.
 # ────────────────────────────────────────────────────────────────────────────
 #
 # Las claves de Postgres tienen que ser solo letras y números: van adentro de
@@ -124,37 +124,6 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-
-  respaldo:
-    # Un dump por día a un bucket S3-compatible (Cloudflare R2, Backblaze B2,
-    # AWS...). Tiene que ser EXTERNO al servidor: un respaldo guardado en el
-    # mismo VPS se muere con él, que es justo lo que pasó.
-    #
-    # Si faltan las variables S3_* este contenedor falla a propósito y se nota
-    # en el panel: un backup que no funciona en silencio es peor que no tener.
-    #
-    # Probar que anda, ahora mismo:  docker exec <contenedor-respaldo> sh backup.sh
-    image: eeshugerman/postgres-backup-s3:16
-    restart: unless-stopped
-    depends_on:
-      postgres:
-        condition: service_healthy
-    environment:
-      SCHEDULE: ${RESPALDO_HORARIO:-@daily}
-      BACKUP_KEEP_DAYS: ${RESPALDO_DIAS:-30}
-      # Si se completa, el dump sale cifrado (GPG). Guardala aparte: sin ella
-      # el respaldo no se puede abrir.
-      PASSPHRASE: ${RESPALDO_CLAVE:-}
-      S3_ENDPOINT: ${S3_ENDPOINT:-}
-      S3_REGION: ${S3_REGION:-auto}
-      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
-      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
-      S3_BUCKET: ${S3_BUCKET}
-      S3_PREFIX: tribuneros/agente
-      POSTGRES_HOST: postgres
-      POSTGRES_DATABASE: agente
-      POSTGRES_USER: ${POSTGRES_USER:-tribuneros}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
 
 volumes:
   postgres_data:

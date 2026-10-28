@@ -51,7 +51,8 @@ Lo que importa acá es qué hace cada uno:
 | `canales/buffer.py` | Junta la ráfaga de mensajes cortos y contesta una vez |
 | `web/webhook.py` | **El servidor que atiende WhatsApp.** Es lo que corre en producción. |
 | `../webhook_chatwoot.py` | El punto de entrada del webhook |
-| `../docker-compose.yml` | **El stack completo como código**: Postgres, webhook, plataforma de pruebas y respaldo diario a un bucket externo. Los pasos para mudarse de servidor están en su encabezado |
+| `../docker-compose.yml` | **El stack completo como código**: Postgres, webhook y plataforma de pruebas. Los pasos para mudarse de servidor están en su encabezado |
+| `../docker-compose.respaldo.yml` | El respaldo diario a un bucket externo, listo pero **sin desplegar** (se pospuso). Instrucciones para activarlo en su encabezado |
 | `../Dockerfile` | Empaqueta el **webhook** (`webhook_chatwoot.py`); el bot de Telegram queda adentro por si lo querés correr |
 | `web/app.py` | La plataforma de pruebas (FastAPI + un solo HTML) — **no es** el webhook |
 

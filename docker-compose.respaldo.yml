@@ -1,0 +1,42 @@
+# Respaldo diario de la base del agente a un bucket externo.
+#
+# HOY NO SE USA: el servidor está contratado por un año y el respaldo se
+# pospuso. Está acá, listo, para cuando se quiera activar. Mientras no se
+# despliegue, la base vive solo en el volumen de este servidor.
+#
+# Para activarlo: crear un bucket S3-compatible (Cloudflare R2, Backblaze B2,
+# AWS...), cargar las variables S3_* de .env.example y copiar el servicio de
+# abajo dentro de docker-compose.yml (o desplegarlo como app aparte, apuntando
+# POSTGRES_HOST al contenedor de Postgres).
+#
+services:
+  respaldo:
+    # Un dump por día a un bucket S3-compatible (Cloudflare R2, Backblaze B2,
+    # AWS...). Tiene que ser EXTERNO al servidor: un respaldo guardado en el
+    # mismo VPS se muere con él, que es justo lo que pasó.
+    #
+    # Si faltan las variables S3_* este contenedor falla a propósito y se nota
+    # en el panel: un backup que no funciona en silencio es peor que no tener.
+    #
+    # Probar que anda, ahora mismo:  docker exec <contenedor-respaldo> sh backup.sh
+    image: eeshugerman/postgres-backup-s3:16
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SCHEDULE: ${RESPALDO_HORARIO:-@daily}
+      BACKUP_KEEP_DAYS: ${RESPALDO_DIAS:-30}
+      # Si se completa, el dump sale cifrado (GPG). Guardala aparte: sin ella
+      # el respaldo no se puede abrir.
+      PASSPHRASE: ${RESPALDO_CLAVE:-}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_REGION: ${S3_REGION:-auto}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
+      S3_BUCKET: ${S3_BUCKET}
+      S3_PREFIX: tribuneros/agente
+      POSTGRES_HOST: postgres
+      POSTGRES_DATABASE: agente
+      POSTGRES_USER: ${POSTGRES_USER:-tribuneros}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
