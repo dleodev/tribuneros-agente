@@ -1,0 +1,160 @@
+# El stack completo del agente de WhatsApp de Tribuneros, en un solo archivo.
+#
+#   postgres  Una sola instancia (hoy una base: `agente`; mañana puede sumar
+#             otras con `CREATE DATABASE`, en vez de levantar un Postgres
+#             por cada app).
+#   agente    El webhook que atiende WhatsApp (webhook_chatwoot.py).
+#   pruebas   La plataforma de pruebas, con usuario y clave (servidor_nube.py).
+#   respaldo  Copia diaria de la base a un almacenamiento EXTERNO al servidor.
+#
+# Chatwoot NO está acá: va como servicio de un clic de Coolify, que ya trae su
+# propio Postgres y Redis (y su propio backup, que se configura en Coolify).
+#
+# El motivo de que esto exista: el VPS anterior venció y se llevó puesto todo
+# lo que vivía adentro. Con este archivo, mudarse es repetir los pasos de abajo.
+#
+# ── MUDANZA A UN SERVIDOR NUEVO ─────────────────────────────────────────────
+#   1. Instalar Coolify y crear un proyecto.
+#   2. DNS: un registro A (o un wildcard *.tribuneros.store) a la IP nueva.
+#   3. Chatwoot: servicio de un clic en Coolify. Crear el usuario admin,
+#      conectar el inbox de WhatsApp (y cambiar el webhook en Meta al dominio
+#      nuevo), crear la etiqueta `humano` y copiar el token de la API.
+#   4. Este stack: aplicación "Docker Compose" apuntando a este repo, rama main.
+#      Cargar en el panel las variables que figuran en .env.example.
+#   5. Dominios — el puerto va en la URL porque ninguno escucha en el 80:
+#        agente   →  https://agente.tribuneros.store:8000
+#        pruebas  →  https://prompt.tribuneros.store:8000
+#   6. Deploy automático: webhook del repo en GitHub (Coolify muestra la URL).
+#   7. Si hay un respaldo, recuperar los datos (la base se pisa por completo):
+#        docker exec <contenedor-respaldo> sh restore.sh
+#      Sin argumentos restaura el último; con un timestamp, uno puntual.
+# ────────────────────────────────────────────────────────────────────────────
+#
+# Las claves de Postgres tienen que ser solo letras y números: van adentro de
+# una URL (POSTGRES_DSN) y un símbolo como @ o / la rompe.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-tribuneros}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: agente
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      # El doble $$ es para que Compose no lo reemplace: lo expande el
+      # shell del contenedor.
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d agente"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  agente:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    expose:
+      - "8000"
+    environment:
+      PROVEEDOR: ${PROVEEDOR:-openai}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      MODELO_OPENAI: ${MODELO_OPENAI:-gpt-5}
+      MODO: produccion
+      # Postgres está en la misma red: se le habla por el nombre del servicio.
+      POSTGRES_DSN: postgresql://${POSTGRES_USER:-tribuneros}:${POSTGRES_PASSWORD}@postgres:5432/agente
+      CACHE: ${CACHE:-true}
+      MAX_TOKENS: ${MAX_TOKENS:-4096}
+      MEMORIA_MENSAJES: ${MEMORIA_MENSAJES:-20}
+      PROMPT_SISTEMA: prompts/sistema.md
+      CHATWOOT_URL: ${CHATWOOT_URL}
+      CHATWOOT_TOKEN: ${CHATWOOT_TOKEN}
+      CHATWOOT_CUENTA_ID: ${CHATWOOT_CUENTA_ID:-1}
+      CHATWOOT_WEBHOOK_TOKEN: ${CHATWOOT_WEBHOOK_TOKEN}
+      CHATWOOT_ETIQUETA_HUMANO: ${CHATWOOT_ETIQUETA_HUMANO:-humano}
+      BUFFER_SEGUNDOS: ${BUFFER_SEGUNDOS:-60}
+      PUERTO: "8000"
+      TIENDANUBE_STORE_ID: ${TIENDANUBE_STORE_ID:-}
+      TIENDANUBE_ACCESS_TOKEN: ${TIENDANUBE_ACCESS_TOKEN:-}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/salud"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  pruebas:
+    build:
+      context: .
+      dockerfile: Dockerfile.pruebas
+    restart: unless-stopped
+    expose:
+      - "8000"
+    environment:
+      PROVEEDOR: ${PROVEEDOR:-openai}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      MODELO_OPENAI: ${MODELO_OPENAI:-gpt-5}
+      # Es un banco de ensayo: la conversación no necesita sobrevivir a un deploy.
+      MODO: test
+      SQLITE_RUTA: datos/conversaciones.db
+      CACHE: ${CACHE:-true}
+      MAX_TOKENS: ${MAX_TOKENS:-4096}
+      MEMORIA_MENSAJES: ${MEMORIA_MENSAJES:-20}
+      PROMPT_SISTEMA: prompts/sistema.md
+      PUERTO: "8000"
+      # Sin estas dos el contenedor se niega a arrancar (ver servidor_nube.py).
+      PRUEBAS_USUARIO: ${PRUEBAS_USUARIO}
+      PRUEBAS_CLAVE: ${PRUEBAS_CLAVE}
+      # Para el botón "Guardar definitivo". Vacías, el botón queda oculto.
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+      GITHUB_REPO: ${GITHUB_REPO:-}
+      GITHUB_BRANCH: ${GITHUB_BRANCH:-main}
+      GITHUB_PROMPT_PATH: ${GITHUB_PROMPT_PATH:-prompts/sistema.md}
+      COOLIFY_URL: ${COOLIFY_URL:-}
+      COOLIFY_TOKEN: ${COOLIFY_TOKEN:-}
+      COOLIFY_APP_UUID: ${COOLIFY_APP_UUID:-}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/salud"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  respaldo:
+    # Un dump por día a un bucket S3-compatible (Cloudflare R2, Backblaze B2,
+    # AWS...). Tiene que ser EXTERNO al servidor: un respaldo guardado en el
+    # mismo VPS se muere con él, que es justo lo que pasó.
+    #
+    # Si faltan las variables S3_* este contenedor falla a propósito y se nota
+    # en el panel: un backup que no funciona en silencio es peor que no tener.
+    #
+    # Probar que anda, ahora mismo:  docker exec <contenedor-respaldo> sh backup.sh
+    image: eeshugerman/postgres-backup-s3:16
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SCHEDULE: ${RESPALDO_HORARIO:-@daily}
+      BACKUP_KEEP_DAYS: ${RESPALDO_DIAS:-30}
+      # Si se completa, el dump sale cifrado (GPG). Guardala aparte: sin ella
+      # el respaldo no se puede abrir.
+      PASSPHRASE: ${RESPALDO_CLAVE:-}
+      S3_ENDPOINT: ${S3_ENDPOINT:-}
+      S3_REGION: ${S3_REGION:-auto}
+      S3_ACCESS_KEY_ID: ${S3_ACCESS_KEY_ID}
+      S3_SECRET_ACCESS_KEY: ${S3_SECRET_ACCESS_KEY}
+      S3_BUCKET: ${S3_BUCKET}
+      S3_PREFIX: tribuneros/agente
+      POSTGRES_HOST: postgres
+      POSTGRES_DATABASE: agente
+      POSTGRES_USER: ${POSTGRES_USER:-tribuneros}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
+volumes:
+  postgres_data:

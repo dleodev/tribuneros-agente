@@ -51,6 +51,7 @@ Lo que importa acá es qué hace cada uno:
 | `canales/buffer.py` | Junta la ráfaga de mensajes cortos y contesta una vez |
 | `web/webhook.py` | **El servidor que atiende WhatsApp.** Es lo que corre en producción. |
 | `../webhook_chatwoot.py` | El punto de entrada del webhook |
+| `../docker-compose.yml` | **El stack completo como código**: Postgres, webhook, plataforma de pruebas y respaldo diario a un bucket externo. Los pasos para mudarse de servidor están en su encabezado |
 | `../Dockerfile` | Empaqueta el **webhook** (`webhook_chatwoot.py`); el bot de Telegram queda adentro por si lo querés correr |
 | `web/app.py` | La plataforma de pruebas (FastAPI + un solo HTML) — **no es** el webhook |
 
@@ -256,7 +257,9 @@ No lo agregues salvo que te lo pidan: son los próximos videos de la serie.
 
 - Más herramientas (hay una sola: el clima)
 - RAG / base de conocimiento
-- Autenticación en la plataforma de pruebas (es local, un solo usuario)
+- Autenticación en la plataforma de pruebas local (`servidor.py`: es local, un
+  solo usuario). La de la nube, `servidor_nube.py`, sí pide usuario y clave
+  (ver `web/acceso.py`) y no arranca sin ellas
 - Varias conversaciones en paralelo en la web (usa un `thread_id` fijo)
 
 ---
