@@ -218,3 +218,27 @@ def test_la_pagina_dice_las_condiciones_de_compra(cliente):
     assert "Andreani" in texto
     assert "a cargo del comprador" in texto
     assert "transferencia o efectivo" in texto
+
+
+def test_el_favicon_y_los_iconos_se_sirven(cliente):
+    """Un favicon que da 404 deja la pestaña con el ícono genérico del navegador."""
+    for ruta, tipo in [
+        ("/favicon.ico", "icon"),
+        ("/favicon.svg", "svg"),
+        ("/apple-touch-icon.png", "png"),
+        ("/icon-192.png", "png"),
+        ("/icon-512.png", "png"),
+        ("/site.webmanifest", None),
+    ]:
+        r = cliente.get(ruta)
+        assert r.status_code == 200, ruta
+        if tipo:
+            assert tipo in r.headers["content-type"], ruta
+
+
+def test_la_pagina_enlaza_el_favicon(cliente):
+    texto = cliente.get("/").text
+
+    assert 'rel="icon" href="favicon.svg"' in texto
+    assert 'rel="apple-touch-icon"' in texto
+    assert 'rel="manifest"' in texto
