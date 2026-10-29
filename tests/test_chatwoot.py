@@ -427,3 +427,68 @@ def test_el_salud_contesta():
 
     assert respuesta.status_code == 200
     assert respuesta.json()["estado"] == "ok"
+
+
+# -- Fotos de producto --------------------------------------------------------
+
+FOTO = "https://acdn-us.mitiendanube.com/stores/007/682/478/products/boca-1024-1024.png"
+
+
+class ChatwootConFotos(ChatwootFalso):
+    """Igual, pero anota las fotos en vez de descargarlas."""
+
+    def __init__(self, falla=False):
+        super().__init__()
+        self.fotos: list[str] = []
+        self._falla = falla
+
+    def _enviar_foto(self, conversacion, url):
+        if self._falla:
+            raise RuntimeError("la CDN no contestó")
+        self.fotos.append(url)
+
+
+def test_la_etiqueta_de_foto_no_sale_como_texto():
+    """Si saliera, la persona vería "[foto: https://...]" escrito en el chat."""
+    canal = ChatwootConFotos()
+
+    canal.enviar("12", [f"Boca titular — $75000\n[foto: {FOTO}]"])
+
+    assert canal.envios() == ["Boca titular — $75000"]
+    assert canal.fotos == [FOTO]
+
+
+def test_un_mensaje_que_es_solo_una_foto_no_manda_texto_vacio():
+    canal = ChatwootConFotos()
+
+    canal.enviar("12", [f"[foto: {FOTO}]"])
+
+    assert canal.envios() == []
+    assert canal.fotos == [FOTO]
+
+
+def test_no_se_mandan_mas_de_tres_fotos_por_mensaje():
+    canal = ChatwootConFotos()
+    cuatro = "\n".join(f"[foto: {FOTO}?{i}]" for i in range(4))
+
+    canal.enviar("12", [cuatro])
+
+    assert len(canal.fotos) == 3
+
+
+def test_si_la_foto_falla_el_texto_igual_sale():
+    canal = ChatwootConFotos(falla=True)
+
+    canal.enviar("12", [f"Boca titular\n[foto: {FOTO}]"])
+
+    assert canal.envios() == ["Boca titular"]
+
+
+def test_no_baja_fotos_de_cualquier_sitio():
+    """El modelo no puede mandar al servidor a descargar una dirección cualquiera."""
+    canal = ChatwootFalso()
+
+    with pytest.raises(ValueError):
+        canal._enviar_foto("12", "https://sitio-malo.example.com/foto.png")
+    with pytest.raises(ValueError):
+        canal._enviar_foto("12", "https://mitiendanube.com.sitio-malo.example.com/foto.png")

@@ -30,15 +30,41 @@ La API de Chatwoot son pedidos HTTP con JSON: no hace falta más.
 from __future__ import annotations
 
 import json
+import logging
+import re
 import urllib.error
+import urllib.parse
 import urllib.request
+import uuid
 from collections import deque
 
 from .base import Canal, MensajeEntrante
 
+log = logging.getLogger(__name__)
+
 # Cuánto esperamos a que Chatwoot conteste. Corre en el mismo servidor que
 # el agente, así que si tarda más que esto es porque algo anda mal.
 ESPERA_DE_RED = 20
+
+# Las fotos de producto. El agente las pide con una línea `[foto: https://...]`
+# dentro de su respuesta (se la da la herramienta de productos). Solo se
+# descargan de la CDN de Tiendanube: el modelo no puede mandar al servidor a
+# bajar cualquier dirección, que sería un agujero.
+ETIQUETA_DE_FOTO = re.compile(r"\[foto:\s*(https?://[^\s\]]+)\]", re.IGNORECASE)
+MAXIMO_DE_FOTOS = 3
+PESO_MAXIMO_DE_FOTO = 5 * 1024 * 1024
+TIPOS_DE_FOTO = {"image/jpeg": "jpg", "image/png": "png"}
+
+
+def separar_fotos(texto: str) -> tuple[str, list[str]]:
+    """Saca las etiquetas de foto del texto. Devuelve (texto limpio, [urls])."""
+    fotos = ETIQUETA_DE_FOTO.findall(texto)
+    return ETIQUETA_DE_FOTO.sub("", texto).strip(), fotos
+
+
+def _es_de_tiendanube(url: str) -> bool:
+    host = (urllib.parse.urlparse(url).hostname or "").lower()
+    return host == "mitiendanube.com" or host.endswith(".mitiendanube.com")
 
 
 class ErrorDeChatwoot(Exception):
@@ -186,14 +212,80 @@ class Chatwoot(Canal):
         corresponda: WhatsApp, Instagram, el widget de la web.
         """
         for texto in mensajes:
-            if not texto.strip():
-                continue
+            texto, fotos = separar_fotos(texto)
 
-            self._api(
-                "POST",
-                f"conversations/{conversacion}/messages",
-                {"content": texto, "message_type": "outgoing"},
-            )
+            if texto:
+                self._api(
+                    "POST",
+                    f"conversations/{conversacion}/messages",
+                    {"content": texto, "message_type": "outgoing"},
+                )
+
+            for foto in fotos[:MAXIMO_DE_FOTOS]:
+                # Una foto que no sale no tiene que tirar abajo la respuesta:
+                # el texto (con el link del producto) ya se mandó.
+                try:
+                    self._enviar_foto(conversacion, foto)
+                except Exception as e:  # noqa: BLE001
+                    log.warning("No se pudo mandar la foto %s: %s", foto, e)
+
+    def _enviar_foto(self, conversacion: str, url: str) -> None:
+        """Descarga la foto y la sube a la conversación como adjunto."""
+        if not _es_de_tiendanube(url):
+            raise ValueError("la foto no es de la CDN de Tiendanube")
+
+        pedido = urllib.request.Request(
+            url,
+            headers={
+                # La CDN rechaza (403) los pedidos que no parecen de un navegador.
+                "User-Agent": "Mozilla/5.0 (compatible; Tribuneros)",
+                "Referer": "https://tribuneros.store/",
+            },
+        )
+        with urllib.request.urlopen(pedido, timeout=ESPERA_DE_RED) as respuesta:
+            tipo = respuesta.headers.get_content_type()
+            contenido = respuesta.read(PESO_MAXIMO_DE_FOTO + 1)
+        if tipo not in TIPOS_DE_FOTO:
+            raise ValueError(f"tipo de imagen no soportado: {tipo}")
+        if len(contenido) > PESO_MAXIMO_DE_FOTO:
+            raise ValueError("la foto pesa demasiado")
+
+        self._api_con_archivo(
+            f"conversations/{conversacion}/messages",
+            archivo=(f"foto.{TIPOS_DE_FOTO[tipo]}", tipo, contenido),
+        )
+
+    def _api_con_archivo(self, camino: str, archivo: tuple[str, str, bytes]) -> dict:
+        """Un POST multipart con un adjunto: así Chatwoot recibe archivos."""
+        nombre, tipo, contenido = archivo
+        limite = uuid.uuid4().hex
+        cuerpo = b"".join(
+            [
+                f"--{limite}\r\nContent-Disposition: form-data; name=\"message_type\"\r\n\r\noutgoing\r\n".encode(),
+                f"--{limite}\r\nContent-Disposition: form-data; name=\"attachments[]\"; "
+                f"filename=\"{nombre}\"\r\nContent-Type: {tipo}\r\n\r\n".encode(),
+                contenido,
+                f"\r\n--{limite}--\r\n".encode(),
+            ]
+        )
+        pedido = urllib.request.Request(
+            f"{self.url}/api/v1/accounts/{self.cuenta_id}/{camino}",
+            data=cuerpo,
+            method="POST",
+            headers={
+                "Content-Type": f"multipart/form-data; boundary={limite}",
+                "api_access_token": self.token,
+            },
+        )
+        try:
+            with urllib.request.urlopen(pedido, timeout=ESPERA_DE_RED) as respuesta:
+                crudo = respuesta.read().decode("utf-8")
+        except urllib.error.HTTPError as e:
+            detalle = e.read().decode("utf-8", "replace")[:300]
+            raise ErrorDeChatwoot(
+                f"Chatwoot devolvió {e.code} al subir una foto a {camino}: {detalle}"
+            ) from None
+        return json.loads(crudo) if crudo else {}
 
     def escribiendo(self, conversacion: str, encendido: bool = True) -> None:
         """El "escribiendo..." mientras el modelo piensa.

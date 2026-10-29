@@ -121,3 +121,33 @@ def test_el_modelo_recibe_una_descripcion_util():
     assert clima.name == "clima"
     assert "clima" in clima.description.lower()
     assert "lugar" in clima.args
+
+
+# -- Fotos de producto --------------------------------------------------------
+
+
+def test_la_foto_del_producto_va_en_una_linea_con_etiqueta():
+    producto = {
+        "name": {"es": "Boca titular"},
+        "canonical_url": "https://tribuneros.store/productos/boca/",
+        "variants": [{"price": "75000.00", "stock": 2, "values": [{"es": "L"}]}],
+        "images": [
+            {"position": 2, "src": "https://acdn-us.mitiendanube.com/x/segunda.png"},
+            {"position": 1, "src": "https://acdn-us.mitiendanube.com/x/primera.jpg"},
+        ],
+    }
+
+    texto = herramientas._describir_producto(producto)
+
+    assert "[foto: https://acdn-us.mitiendanube.com/x/primera.jpg]" in texto
+
+
+def test_una_foto_webp_no_se_ofrece():
+    """WhatsApp no la muestra como imagen, así que mejor no mandarla."""
+    producto = {
+        "name": {"es": "Boca"},
+        "variants": [{"price": "1", "stock": 1, "values": [{"es": "L"}]}],
+        "images": [{"position": 1, "src": "https://acdn-us.mitiendanube.com/x/foto.webp"}],
+    }
+
+    assert "[foto:" not in herramientas._describir_producto(producto)

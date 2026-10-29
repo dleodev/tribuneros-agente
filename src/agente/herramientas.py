@@ -525,6 +525,10 @@ def _describir_producto(p: dict) -> str:
     lineas = [f"{nombre} — ${precio}" if precio else nombre]
     if link:
         lineas.append(f"Link: {link}")
+    foto = _foto_de(p)
+    if foto:
+        # El canal de Chatwoot reconoce esta etiqueta y manda la imagen.
+        lineas.append(f"[foto: {foto}]")
 
     con_stock = [_talle(v) for v in variantes if (v.get("stock") or 0) > 0]
     if con_stock:
@@ -536,6 +540,19 @@ def _describir_producto(p: dict) -> str:
             lineas.append("Alternativas con stock: " + "; ".join(alternativas))
 
     return "\n".join(lineas)
+
+
+def _foto_de(p: dict) -> str:
+    """La primera foto del producto, o "" si no hay una que WhatsApp acepte.
+
+    WhatsApp solo muestra como imagen un JPG o un PNG: un .webp llegaría como
+    archivo suelto, así que esos no se mandan.
+    """
+    for imagen in sorted(p.get("images") or [], key=lambda i: i.get("position") or 0):
+        url = (imagen.get("src") or "").strip()
+        if url.lower().endswith((".png", ".jpg", ".jpeg")):
+            return url if url.startswith("http") else "https:" + url
+    return ""
 
 
 def _talle(variante: dict) -> str:
