@@ -53,7 +53,7 @@ Lo que importa acá es qué hace cada uno:
 | `../webhook_chatwoot.py` | El punto de entrada del webhook |
 | `../docker-compose.yml` | **El stack completo como código**: Postgres, webhook y plataforma de pruebas. Los pasos para mudarse de servidor están en su encabezado |
 | `../docker-compose.respaldo.yml` | El respaldo diario a un bucket externo, listo pero **sin desplegar** (se pospuso). Instrucciones para activarlo en su encabezado |
-| `mayorista/` | La web mayorista (mayorista.tribuneros.store): catálogo con el stock y los talles de Tiendanube, carrito y pedido por WhatsApp. Es un servicio más del compose. Los precios por cantidad (6 o más / 12 o más) están en `servidor.py` |
+| `mayorista/` | La web mayorista (mayorista.tribuneros.store): catálogo con el stock y los talles de Tiendanube, carrito y pedido por WhatsApp. Los precios por cantidad (6 o más / 12 o más) están en `sitio.py`. En `/admin` tiene un panel con login (`acceso.py`, `admin.py`, `static/admin/`): planilla de stock tipo Excel que escribe directo en Tiendanube (`tn.py`), carga por curva, modelos nuevos e historial con deshacer (`historial.py`, en Postgres) |
 | `../Dockerfile` | Empaqueta el **webhook** (`webhook_chatwoot.py`); el bot de Telegram queda adentro por si lo querés correr |
 | `web/app.py` | La plataforma de pruebas (FastAPI + un solo HTML) — **no es** el webhook |
 

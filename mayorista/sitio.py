@@ -1,6 +1,6 @@
 """La web mayorista de Tribuneros (mayorista.tribuneros.store).
 
-    python servidor.py
+    python sitio.py
 
 Es un catálogo con carrito que manda el pedido por WhatsApp. El stock y los
 talles NO se copian a mano: se leen de Tiendanube cada pocos minutos, así que
@@ -22,25 +22,26 @@ descuenta en Tiendanube cuando llega el pago (ver las condiciones en la web).
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 import re
 import threading
 import time
-import urllib.request
+from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Response
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.staticfiles import StaticFiles
+
+import admin
+import historial as hist
+import tn
 
 log = logging.getLogger("mayorista")
 
 CARPETA = Path(__file__).parent
 PUERTO = int(os.getenv("PUERTO", "8000"))
 
-TIENDA = os.getenv("TIENDANUBE_STORE_ID", "").strip()
-TOKEN = os.getenv("TIENDANUBE_ACCESS_TOKEN", "").strip()
 CACHE_SEGUNDOS = int(os.getenv("MAYORISTA_CACHE_SEGUNDOS", "300"))
 # Con "true" no se puede pedir más unidades de un talle que las que hay.
 LIMITAR_STOCK = os.getenv("MAYORISTA_LIMITAR_STOCK", "true").strip().lower() in ("1", "true", "si", "yes")
@@ -51,12 +52,6 @@ TRAMOS = [{"desde": 12, "precio": 35000}, {"desde": 6, "precio": 38000}]
 MINIMO = 6
 
 ORDEN_DE_TALLES = ["XS", "S", "M", "L", "XL", "XXL", "XXXL"]
-CABECERAS_CDN = {
-    # La CDN devuelve 403 si el pedido no parece de un navegador.
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36",
-    "Referer": "https://tribuneros.store/",
-    "Accept": "image/webp,image/*",
-}
 
 _LIMPIAR = [
     r"\s*\|.*$",
@@ -68,35 +63,13 @@ _LIMPIAR = [
 
 _candado = threading.Lock()
 _cache: dict = {"t": 0.0, "catalogo": None, "imagenes": {}}
-_fotos: dict[str, bytes] = {}
 
 
 # -- Tiendanube ---------------------------------------------------------------
 
 
-def _pedir(ruta: str) -> list | dict:
-    pedido = urllib.request.Request(
-        f"https://api.tiendanube.com/v1/{TIENDA}{ruta}",
-        headers={
-            # Tiendanube no usa "Authorization": su header se llama Authentication.
-            "Authentication": f"bearer {TOKEN}",
-            "User-Agent": "Tribuneros Mayorista (hello@levelone.agency)",
-        },
-    )
-    with urllib.request.urlopen(pedido, timeout=30) as respuesta:
-        return json.load(respuesta)
-
-
 def _traer_productos() -> list[dict]:
-    if not TIENDA or not TOKEN:
-        raise RuntimeError("Faltan TIENDANUBE_STORE_ID y TIENDANUBE_ACCESS_TOKEN.")
-    productos: list[dict] = []
-    for pagina in range(1, 21):
-        lote = _pedir(f"/products?per_page=200&page={pagina}")
-        productos += lote
-        if len(lote) < 200:
-            break
-    return productos
+    return tn.todos_los_productos()
 
 
 # -- Armar el catálogo --------------------------------------------------------
@@ -197,7 +170,35 @@ def _actualizar_si_hace_falta() -> None:
 
 # -- La app -------------------------------------------------------------------
 
-app = FastAPI(title="Tribuneros Mayorista", docs_url=None, redoc_url=None)
+_historial = hist.crear()
+
+
+def _invalidar_cache() -> None:
+    """Después de tocar el stock, la web pública vuelve a leer Tiendanube ya."""
+    _cache["t"] = 0.0
+
+
+@asynccontextmanager
+async def _vida(_app: FastAPI):
+    if _historial:
+        _historial.preparar()  # crea la tabla; si no hay base, el contenedor falla a la vista
+    yield
+
+
+app = FastAPI(title="Tribuneros Mayorista", docs_url=None, redoc_url=None, lifespan=_vida)
+app.include_router(admin.crear_router(_historial, _invalidar_cache))
+
+
+@app.middleware("http")
+async def _cabeceras_del_panel(request: Request, llamar):
+    """El panel no se guarda en cachés, no se mete en un marco y no se indexa."""
+    respuesta = await llamar(request)
+    if request.url.path.startswith("/admin"):
+        respuesta.headers["Cache-Control"] = "no-store"
+        respuesta.headers["X-Frame-Options"] = "DENY"
+        respuesta.headers["Referrer-Policy"] = "no-referrer"
+        respuesta.headers["X-Robots-Tag"] = "noindex, nofollow"
+    return respuesta
 
 
 @app.get("/salud")
@@ -231,14 +232,12 @@ def imagen(producto: int, n: int) -> Response:
     if n < 1 or n > len(urls):
         raise HTTPException(404, "No existe esa foto")
     url = urls[n - 1]
-    if url not in _fotos:
-        try:
-            with urllib.request.urlopen(urllib.request.Request(url, headers=CABECERAS_CDN), timeout=30) as r:
-                _fotos[url] = r.read()
-        except Exception as e:  # noqa: BLE001
-            log.warning("No se pudo bajar la foto %s: %s", url, e)
-            raise HTTPException(502, "No se pudo cargar la foto") from None
-    return Response(_fotos[url], media_type="image/webp", headers={"Cache-Control": "public, max-age=86400"})
+    try:
+        contenido = tn.bajar_foto(url)
+    except Exception as e:  # noqa: BLE001
+        log.warning("No se pudo bajar la foto %s: %s", url, e)
+        raise HTTPException(502, "No se pudo cargar la foto") from None
+    return Response(contenido, media_type="image/webp", headers={"Cache-Control": "public, max-age=86400"})
 
 
 # La página y el logo, al final: lo de arriba tiene prioridad sobre los archivos.

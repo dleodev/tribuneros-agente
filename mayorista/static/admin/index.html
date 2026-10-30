@@ -1,0 +1,559 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<meta name="theme-color" content="#0e1f16">
+<title>Panel mayorista · Tribuneros</title>
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="icon" href="../favicon.ico" sizes="48x48">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,700;0,9..40,800&family=Playfair+Display:ital,wght@0,700;0,800&display=swap">
+<style>
+/* Una planilla: densa, de teclado, sobre el mismo verde noche de la web mayorista. */
+:root {
+  --noche: #0e1f16; --noche-2: #132a1d; --tarjeta: #16301f; --linea: #2f5440; --pino: #1f3f2c;
+  --crema: #f5efe6; --papel: #f1e4c5; --mostaza: #c49a2b; --mostaza-claro: #e0b84a; --bordo: #a23a2c;
+  --texto: #f1e4c5; --suave: #b9c3b4; --ok: #7fbf8f; --error: #ff9b8c; --tinta: #2a1f18;
+  --cambio: rgba(196, 154, 43, .22);
+  --display: "Playfair Display", Georgia, serif;
+  --cuerpo: "DM Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--noche); color: var(--texto); font: 14px/1.45 var(--cuerpo); -webkit-font-smoothing: antialiased; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--mostaza-claro); outline-offset: 1px; border-radius: 4px; }
+[hidden] { display: none !important; }
+.wrap { padding-left: max(14px, env(safe-area-inset-left, 0px)); padding-right: max(14px, env(safe-area-inset-right, 0px)); }
+
+/* barra superior */
+.top { position: sticky; top: 0; z-index: 30; background: var(--noche); border-bottom: 1px solid var(--linea); padding-top: env(safe-area-inset-top, 0px); }
+.top .wrap { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding-block: 8px; }
+.marca { font-family: var(--display); font-weight: 800; font-size: 20px; }
+.marca small { font-family: var(--cuerpo); font-weight: 800; font-size: 11px; letter-spacing: .18em; text-transform: uppercase; color: var(--mostaza); border: 1.5px dashed var(--mostaza); border-radius: 4px; padding: 2px 8px; margin-left: 10px; }
+.pestanas { display: flex; gap: 4px; margin-left: 8px; }
+.pestana { background: transparent; border: 0; border-radius: 8px; padding: 8px 14px; font-weight: 700; color: var(--suave); min-height: 40px; }
+.pestana[aria-selected="true"] { background: var(--pino); color: var(--papel); }
+.espacio { flex: 1; }
+.usuario { color: var(--suave); }
+
+.btn { background: transparent; border: 1.5px solid var(--linea); border-radius: 10px; padding: 8px 14px; font-weight: 700; min-height: 40px; }
+.btn:hover:not(:disabled) { border-color: var(--mostaza); }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn.fuerte { background: var(--mostaza); border-color: var(--mostaza); color: var(--tinta); font-weight: 800; }
+.btn.chico { min-height: 32px; padding: 4px 10px; font-size: 13px; }
+
+/* login */
+.entrada { min-height: 100vh; display: grid; place-items: center; padding: 20px; }
+.tarjeta-login { width: min(380px, 100%); background: var(--tarjeta); border: 1px solid var(--linea); border-radius: 18px; padding: 28px; display: grid; gap: 14px; }
+.tarjeta-login h1 { font-family: var(--display); font-size: 26px; margin: 0; }
+.campo { display: grid; gap: 6px; }
+.campo label { font-size: 13px; font-weight: 700; color: var(--suave); }
+.campo input, .campo select, .campo textarea { background: var(--noche); border: 1.5px solid var(--linea); border-radius: 10px; padding: 10px 12px; min-height: 42px; width: 100%; }
+.mensaje { min-height: 20px; color: var(--error); font-size: 13px; }
+.mensaje.ok { color: var(--ok); }
+
+/* planilla */
+.herramientas { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; padding-block: 12px; }
+.herramientas input[type="search"] { background: var(--noche-2); border: 1.5px solid var(--linea); border-radius: 10px; padding: 8px 12px; min-height: 40px; width: min(260px, 100%); }
+.herramientas select { background: var(--noche-2); border: 1.5px solid var(--linea); border-radius: 10px; padding: 8px 10px; min-height: 40px; }
+.estado { color: var(--suave); }
+.estado b { color: var(--mostaza-claro); }
+.tabla-caja { overflow: auto; border: 1px solid var(--linea); border-radius: 12px; max-height: calc(100vh - 190px); margin-bottom: 40px; background: var(--noche-2); }
+table { border-collapse: separate; border-spacing: 0; width: 100%; min-width: 760px; }
+th, td { padding: 4px 6px; border-bottom: 1px solid var(--linea); border-right: 1px solid rgba(47, 84, 64, .5); text-align: center; vertical-align: middle; }
+th { position: sticky; top: 0; z-index: 5; background: var(--pino); font-weight: 800; letter-spacing: .06em; font-size: 12px; text-transform: uppercase; padding-block: 9px; }
+th.modelo, td.modelo { text-align: left; position: sticky; left: 0; z-index: 4; background: var(--noche-2); min-width: 250px; max-width: 330px; }
+th.modelo { z-index: 6; background: var(--pino); }
+td.sel, th.sel { width: 34px; }
+td.foto { width: 46px; padding: 3px; }
+td.foto img { width: 40px; height: 40px; object-fit: cover; border-radius: 6px; background: #2b2b2b; display: block; }
+.nombre { font-weight: 700; overflow-wrap: anywhere; }
+.etiquetas { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 2px; }
+.etq { font-size: 11px; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; border: 1px solid var(--linea); border-radius: 5px; padding: 0 6px; color: var(--suave); }
+.etq.oculto { color: var(--error); border-color: var(--bordo); }
+.celda { width: 58px; text-align: center; background: transparent; border: 1.5px solid transparent; border-radius: 6px; padding: 6px 2px; min-height: 34px; font-variant-numeric: tabular-nums; font-weight: 700; font-size: 15px; }
+.celda:hover { border-color: var(--linea); }
+.celda:focus { border-color: var(--mostaza-claro); background: var(--noche); }
+.celda.cero { color: var(--suave); font-weight: 500; }
+.celda.cambio { background: var(--cambio); border-color: var(--mostaza); color: var(--papel); }
+.celda.falta { color: var(--suave); }
+.celda.falta::placeholder { color: #587061; }
+.celda:disabled { cursor: not-allowed; opacity: .5; }
+td.otras { text-align: left; min-width: 150px; font-size: 12px; }
+.otra { display: flex; align-items: center; gap: 6px; justify-content: space-between; }
+.otra span { overflow-wrap: anywhere; color: var(--suave); }
+.otra .celda { width: 46px; min-height: 28px; font-size: 13px; padding: 2px; }
+td.total { font-weight: 800; font-variant-numeric: tabular-nums; min-width: 54px; color: var(--mostaza-claro); }
+tr.fila-cambio td.modelo { box-shadow: inset 3px 0 0 var(--mostaza); }
+tr.sin-stock .nombre { color: var(--suave); }
+.vacio { padding: 36px; text-align: center; color: var(--suave); }
+
+/* paneles de las otras pestañas */
+.panel { max-width: 760px; padding-block: 18px 60px; display: grid; gap: 16px; }
+.panel h2 { font-family: var(--display); margin: 0; font-size: 24px; }
+.grupo { background: var(--tarjeta); border: 1px solid var(--linea); border-radius: 14px; padding: 16px; display: grid; gap: 12px; }
+.fila-talles { display: flex; flex-wrap: wrap; gap: 10px; }
+.talle-nuevo { display: grid; gap: 4px; text-align: center; font-weight: 700; font-size: 13px; color: var(--suave); }
+.talle-nuevo input { width: 66px; text-align: center; background: var(--noche); border: 1.5px solid var(--linea); border-radius: 8px; padding: 8px 4px; min-height: 40px; }
+.categorias { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 4px 12px; max-height: 190px; overflow: auto; }
+.categorias label { display: flex; gap: 8px; align-items: center; min-height: 30px; }
+.previas { display: flex; gap: 10px; flex-wrap: wrap; }
+.previas figure { margin: 0; position: relative; }
+.previas img { width: 88px; height: 88px; object-fit: cover; border-radius: 8px; border: 1px solid var(--linea); }
+.previas button { position: absolute; top: -8px; right: -8px; width: 26px; height: 26px; border-radius: 50%; border: 0; background: var(--bordo); color: var(--crema); font-weight: 800; }
+
+.lote { background: var(--tarjeta); border: 1px solid var(--linea); border-radius: 14px; padding: 12px 14px; display: grid; gap: 8px; }
+.lote header { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; }
+.lote header b { font-size: 15px; }
+.lote .detalle { display: grid; gap: 2px; color: var(--suave); font-size: 13px; }
+.lote .deshecho { color: var(--suave); font-style: italic; }
+.flecha { color: var(--mostaza-claro); font-weight: 800; }
+
+/* ventanas */
+.velo { position: fixed; inset: 0; background: rgba(5, 12, 8, .75); z-index: 80; display: none; }
+.velo.on { display: block; }
+.ventana { position: fixed; z-index: 90; left: 50%; top: 50%; transform: translate(-50%, -50%); width: min(560px, calc(100% - 24px)); max-height: calc(100% - 24px); overflow: auto; background: var(--noche-2); border: 1px solid var(--linea); border-radius: 18px; padding: 20px; display: none; gap: 14px; }
+.ventana.on { display: grid; }
+.ventana h2 { font-family: var(--display); margin: 0; font-size: 22px; }
+.resumen { max-height: 300px; overflow: auto; border: 1px solid var(--linea); border-radius: 10px; }
+.resumen div { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 12px; padding: 6px 10px; border-bottom: 1px solid var(--linea); font-size: 13px; }
+.resumen div:last-child { border-bottom: 0; }
+.acciones { display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.aviso-error { background: rgba(162, 58, 44, .22); border: 1px solid var(--bordo); border-radius: 10px; padding: 10px 12px; }
+.aviso-error ul { margin: 6px 0 0; padding-left: 18px; }
+.toast { position: fixed; z-index: 100; left: 50%; bottom: calc(18px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--crema); color: var(--tinta); border-radius: 999px; padding: 10px 18px; font-weight: 800; max-width: calc(100% - 24px); box-shadow: 0 8px 30px rgba(0, 0, 0, .4); }
+.ayuda { color: var(--suave); font-size: 13px; margin: 0; }
+@media (max-width: 720px) { .top .wrap { gap: 8px; } .pestanas { margin-left: 0; width: 100%; } .tabla-caja { max-height: none; } th.modelo, td.modelo { min-width: 190px; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<main class="entrada" id="vistaLogin" hidden>
+  <form class="tarjeta-login" id="formLogin" autocomplete="on">
+    <h1>Panel mayorista</h1>
+    <p class="ayuda" id="ayudaLogin">Entrá con tu usuario y tu clave.</p>
+    <div class="campo"><label for="lUsuario">Usuario</label><input id="lUsuario" name="username" autocomplete="username" required></div>
+    <div class="campo"><label for="lClave">Clave</label><input id="lClave" name="password" type="password" autocomplete="current-password" required></div>
+    <div class="mensaje" id="errorLogin" role="alert"></div>
+    <button class="btn fuerte" id="btnLogin" type="submit">Entrar</button>
+  </form>
+</main>
+
+<!-- APP -->
+<div id="vistaApp" hidden>
+  <header class="top"><div class="wrap">
+    <span class="marca">Tribuneros<small>Panel mayorista</small></span>
+    <nav class="pestanas" role="tablist">
+      <button class="pestana" role="tab" aria-selected="true" data-pestana="stock">Stock</button>
+      <button class="pestana" role="tab" aria-selected="false" data-pestana="nuevo">Modelo nuevo</button>
+      <button class="pestana" role="tab" aria-selected="false" data-pestana="historial">Historial</button>
+    </nav>
+    <span class="espacio"></span>
+    <span class="usuario" id="nombreUsuario"></span>
+    <a class="btn chico" href="/" target="_blank" rel="noopener" style="text-decoration:none;display:inline-flex;align-items:center">Ver la web</a>
+    <button class="btn chico" id="btnSalir" type="button">Salir</button>
+  </div></header>
+
+  <!-- STOCK -->
+  <section id="pestanaStock"><div class="wrap">
+    <div class="herramientas">
+      <input type="search" id="buscar" placeholder="Buscar modelo..." autocomplete="off">
+      <select id="filtro" aria-label="Filtro">
+        <option value="todos">Todos los modelos</option>
+        <option value="con">Con stock</option>
+        <option value="sin">Sin stock</option>
+        <option value="ocultos">Ocultos en la tienda</option>
+        <option value="cambios">Con cambios sin guardar</option>
+      </select>
+      <button class="btn" id="btnCurva" type="button" disabled>Cargar por curva</button>
+      <span class="espacio"></span>
+      <span class="estado" id="estadoCambios"></span>
+      <button class="btn" id="btnDescartar" type="button" disabled>Descartar</button>
+      <button class="btn fuerte" id="btnGuardar" type="button" disabled>Guardar cambios</button>
+    </div>
+    <p class="ayuda">Escribí en las celdas, o pegá un bloque copiado de Excel. Las celdas en mostaza son cambios sin guardar. Enter baja a la fila de abajo.</p>
+    <div class="tabla-caja"><table id="tabla"><thead id="cabeza"></thead><tbody id="cuerpo"></tbody></table></div>
+    <div class="vacio" id="cargando">Cargando la planilla...</div>
+  </div></section>
+
+  <!-- MODELO NUEVO -->
+  <section id="pestanaNuevo" hidden><div class="wrap"><form class="panel" id="formNuevo">
+    <h2>Modelo nuevo</h2>
+    <div class="grupo">
+      <div class="campo"><label for="nNombre">Nombre</label><input id="nNombre" maxlength="200" placeholder="Boca Juniors - Retro 2004" required></div>
+      <div class="campo"><label for="nPrecio">Precio de la tienda (por unidad)</label><input id="nPrecio" type="number" min="1" step="any" inputmode="decimal" placeholder="75000" required></div>
+    </div>
+    <div class="grupo">
+      <b>Talles y stock</b>
+      <div class="fila-talles" id="nTalles"></div>
+      <div class="acciones" style="justify-content:flex-start">
+        <input id="nTalleExtra" class="celda" style="width:110px;border-color:var(--linea)" placeholder="Otro talle" maxlength="40">
+        <button class="btn chico" id="nAgregarTalle" type="button">Agregar talle</button>
+      </div>
+    </div>
+    <div class="grupo"><b>Categorías</b><div class="categorias" id="nCategorias">Cargando...</div></div>
+    <div class="grupo">
+      <b>Fotos (hasta 4)</b>
+      <input type="file" id="nFotos" accept="image/jpeg,image/png,image/webp" multiple>
+      <div class="previas" id="nPrevias"></div>
+    </div>
+    <label class="grupo" style="grid-auto-flow:column;justify-content:start;align-items:center"><input type="checkbox" id="nPublicar"> Publicar en la tienda y en el mayorista apenas se cree</label>
+    <div class="mensaje" id="errorNuevo" role="alert"></div>
+    <div class="acciones" style="justify-content:flex-start"><button class="btn fuerte" id="btnCrear" type="submit">Crear modelo</button></div>
+  </form></div></section>
+
+  <!-- HISTORIAL -->
+  <section id="pestanaHistorial" hidden><div class="wrap"><div class="panel">
+    <h2>Historial</h2>
+    <p class="ayuda">Cada guardado queda acá. «Deshacer» devuelve el stock a como estaba, siempre que nadie lo haya tocado después.</p>
+    <div id="listaHistorial" style="display:grid;gap:10px"></div>
+  </div></div></section>
+</div>
+
+<!-- Ventanas -->
+<div class="velo" id="velo"></div>
+
+<section class="ventana" id="ventanaCurva" role="dialog" aria-modal="true" aria-labelledby="tCurva">
+  <h2 id="tCurva">Cargar por curva</h2>
+  <p class="ayuda" id="curvaModelos"></p>
+  <div class="campo"><label for="curvaTexto">Curva de talles</label><input id="curvaTexto" placeholder="S1 M2 L3 XL2 XXL1" autocomplete="off"></div>
+  <div class="campo"><label for="curvaVeces">Cuántas veces</label><input id="curvaVeces" type="number" min="1" max="99" value="1" inputmode="numeric"></div>
+  <div class="campo"><label for="curvaModo">Cómo se aplica</label>
+    <select id="curvaModo"><option value="sumar">Sumar al stock que hay</option><option value="poner">Dejar exactamente esa cantidad</option></select></div>
+  <p class="ayuda" id="curvaResumen"></p>
+  <div class="mensaje" id="errorCurva" role="alert"></div>
+  <div class="acciones"><button class="btn" type="button" data-cerrar>Cancelar</button><button class="btn fuerte" id="btnAplicarCurva" type="button">Aplicar a la planilla</button></div>
+</section>
+
+<section class="ventana" id="ventanaRevision" role="dialog" aria-modal="true" aria-labelledby="tRevision">
+  <h2 id="tRevision">Revisá antes de guardar</h2>
+  <p class="ayuda" id="revisionResumen"></p>
+  <div class="resumen" id="revisionLista"></div>
+  <div class="aviso-error" id="revisionError" hidden></div>
+  <div class="acciones"><button class="btn" type="button" data-cerrar id="btnVolver">Volver a la planilla</button><button class="btn fuerte" id="btnConfirmar" type="button">Guardar en Tiendanube</button></div>
+</section>
+
+<div class="toast" id="toast" role="status" hidden></div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? "" : s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const ORDEN = ["XS", "S", "M", "L", "XL", "XXL", "XXXL"];
+const norm = (t) => String(t).toUpperCase().split(/\s+/).filter(Boolean).join(" ");
+const esEstandar = (t) => ORDEN.includes(norm(t));
+
+let productos = [], maximo = 9999, columnas = ["S", "M", "L", "XL", "XXL"];
+let pend = new Map();          // "producto|TALLE" -> cambio pendiente
+let seleccion = new Set();     // ids de modelos tildados
+let visibles = [];             // modelos que se ven ahora, en orden
+let reintentoLogin = false;
+
+/* ---------- red ---------- */
+async function api(ruta, { metodo = "GET", cuerpo } = {}) {
+  const r = await fetch("/admin/api" + ruta, {
+    method: metodo, credentials: "same-origin",
+    headers: { "Content-Type": "application/json", "x-mayorista": "1" },
+    body: cuerpo ? JSON.stringify(cuerpo) : undefined,
+  });
+  let datos = null; try { datos = await r.json(); } catch (e) {}
+  if (!r.ok) {
+    const d = datos && datos.detail;
+    const e = new Error((d && d.mensaje) || (typeof d === "string" ? d : Array.isArray(d) ? "Revisá los datos ingresados." : "Error " + r.status));
+    e.estado = r.status; e.conflictos = d && d.conflictos;
+    if (r.status === 401 && !reintentoLogin) mostrarLogin();
+    throw e;
+  }
+  return datos;
+}
+let avisoTimer;
+function aviso(texto) { const t = $("toast"); t.textContent = texto; t.hidden = false; clearTimeout(avisoTimer); avisoTimer = setTimeout(() => (t.hidden = true), 3500); }
+
+/* ---------- sesión ---------- */
+function mostrarLogin() { $("vistaApp").hidden = true; $("vistaLogin").hidden = false; $("lClave").value = ""; setTimeout(() => $("lUsuario").focus(), 50); }
+async function arrancar() {
+  let e; try { e = await api("/estado"); } catch (x) { e = { configurado: true, usuario: null }; }
+  if (!e.configurado) { $("vistaLogin").hidden = false; $("formLogin").hidden = true; document.querySelector(".tarjeta-login").insertAdjacentHTML("afterbegin", "<h1>Panel mayorista</h1><p>El panel todavía no está configurado en el servidor (faltan el usuario, la clave o la base de datos).</p>"); return; }
+  if (!e.usuario) return mostrarLogin();
+  entrar(e.usuario);
+}
+function entrar(usuario) { $("vistaLogin").hidden = true; $("vistaApp").hidden = false; $("nombreUsuario").textContent = usuario; cargarPlanilla(); }
+$("formLogin").addEventListener("submit", async (ev) => {
+  ev.preventDefault(); $("errorLogin").textContent = ""; $("btnLogin").disabled = true; reintentoLogin = true;
+  try { const r = await api("/login", { metodo: "POST", cuerpo: { usuario: $("lUsuario").value, clave: $("lClave").value } }); entrar(r.usuario); }
+  catch (e) { $("errorLogin").textContent = e.message; }
+  finally { $("btnLogin").disabled = false; reintentoLogin = false; }
+});
+$("btnSalir").addEventListener("click", async () => {
+  if (pend.size && !confirm("Tenés cambios sin guardar. ¿Salir igual?")) return;
+  pend.clear(); try { await api("/logout", { metodo: "POST" }); } catch (e) {} mostrarLogin();
+});
+
+/* ---------- pestañas ---------- */
+document.querySelectorAll(".pestana").forEach((b) => b.addEventListener("click", () => {
+  document.querySelectorAll(".pestana").forEach((x) => x.setAttribute("aria-selected", String(x === b)));
+  ["stock", "nuevo", "historial"].forEach((p) => ($("pestana" + p[0].toUpperCase() + p.slice(1)).hidden = p !== b.dataset.pestana));
+  if (b.dataset.pestana === "historial") cargarHistorial();
+  if (b.dataset.pestana === "nuevo") prepararNuevo();
+}));
+
+/* ---------- planilla ---------- */
+async function cargarPlanilla() {
+  $("cargando").hidden = false; $("cargando").textContent = "Cargando la planilla...";
+  try {
+    const d = await api("/stock"); productos = d.productos; maximo = d.stock_maximo;
+    const extra = new Set(); productos.forEach((p) => p.variantes.forEach((v) => { if (esEstandar(v.talle)) extra.add(norm(v.talle)); }));
+    columnas = ORDEN.filter((t) => ["S", "M", "L", "XL", "XXL"].includes(t) || extra.has(t));
+    pend.clear(); seleccion.clear(); $("cargando").hidden = true; pintar();
+  } catch (e) { $("cargando").hidden = false; $("cargando").textContent = "No se pudo cargar la planilla: " + e.message; }
+}
+const clave = (p, t) => p + "|" + norm(t);
+const varianteDe = (p, t) => p.variantes.find((v) => norm(v.talle) === norm(t));
+function valorMostrado(p, t) { const c = pend.get(clave(p.id, t)); if (c) return c.despues; const v = varianteDe(p, t); return v && v.stock != null ? v.stock : null; }
+const totalDe = (p) => p.variantes.reduce((a, v) => a + (valorMostrado(p, v.talle) || 0), 0);
+function totalReal(p) { return p.variantes.reduce((a, v) => a + (v.stock || 0), 0); }
+const tieneCambios = (p) => [...pend.values()].some((c) => c.producto === p.id);
+
+function filtrar() {
+  const q = $("buscar").value.trim().toLowerCase(), f = $("filtro").value;
+  return productos.filter((p) => {
+    if (q && !p.nombre.toLowerCase().includes(q)) return false;
+    if (f === "con") return totalDe(p) > 0;
+    if (f === "sin") return totalDe(p) === 0;
+    if (f === "ocultos") return !p.publicado;
+    if (f === "cambios") return tieneCambios(p);
+    return true;
+  });
+}
+function pintar() {
+  $("cabeza").innerHTML = `<tr><th class="sel"><input type="checkbox" id="selTodos" aria-label="Seleccionar los que se ven"></th><th></th><th class="modelo">Modelo</th>${columnas.map((t) => `<th>${t}</th>`).join("")}<th>Otras</th><th>Total</th></tr>`;
+  visibles = filtrar();
+  $("cuerpo").innerHTML = visibles.map(fila).join("") || `<tr><td colspan="${columnas.length + 5}" class="vacio">No hay modelos con ese filtro.</td></tr>`;
+  $("selTodos").checked = visibles.length > 0 && visibles.every((p) => seleccion.has(p.id));
+  estadoBarra();
+}
+function celda(p, t) {
+  const v = varianteDe(p, t), val = valorMostrado(p, t), c = pend.get(clave(p.id, t));
+  if (!v && !c && val === null) return `<td><input class="celda falta" data-p="${p.id}" data-t="${esc(t)}" placeholder="·" inputmode="numeric" maxlength="4" autocomplete="off" aria-label="${esc(p.nombre)} talle ${esc(t)}"></td>`;
+  const dis = v && v.stock == null ? " disabled title=\"Tiendanube no lleva la cuenta de este talle\"" : "";
+  return `<td><input class="celda${c ? " cambio" : ""}${val === 0 ? " cero" : ""}" data-p="${p.id}" data-t="${esc(t)}" value="${val == null ? "" : val}" inputmode="numeric" maxlength="4" autocomplete="off"${dis} aria-label="${esc(p.nombre)} talle ${esc(t)}"></td>`;
+}
+function fila(p) {
+  const extras = p.variantes.filter((v) => !columnas.includes(norm(v.talle)));
+  const otras = extras.map((v) => { const val = valorMostrado(p, v.talle), c = pend.get(clave(p.id, v.talle));
+    return `<div class="otra"><span>${esc(v.talle)}</span><input class="celda${c ? " cambio" : ""}${val === 0 ? " cero" : ""}" data-p="${p.id}" data-t="${esc(v.talle)}" value="${val == null ? "" : val}" inputmode="numeric" maxlength="4" autocomplete="off"${v.stock == null ? " disabled" : ""} aria-label="${esc(p.nombre)} ${esc(v.talle)}"></div>`; }).join("");
+  const total = totalDe(p);
+  return `<tr data-fila="${p.id}" class="${tieneCambios(p) ? "fila-cambio" : ""}${total === 0 ? " sin-stock" : ""}">
+    <td class="sel"><input type="checkbox" data-sel="${p.id}" ${seleccion.has(p.id) ? "checked" : ""} aria-label="Elegir ${esc(p.nombre)}"></td>
+    <td class="foto">${p.foto ? `<img src="/admin/api/foto/${p.id}" alt="" loading="lazy" width="40" height="40">` : ""}</td>
+    <td class="modelo"><div class="nombre">${esc(p.nombre)}</div><div class="etiquetas">${p.publicado ? "" : '<span class="etq oculto">Oculto</span>'}${p.categorias.map((c) => `<span class="etq">${esc(c)}</span>`).join("")}</div></td>
+    ${columnas.map((t) => celda(p, t)).join("")}<td class="otras">${otras}</td><td class="total" data-total="${p.id}">${total}</td></tr>`;
+}
+function estadoBarra() {
+  const n = pend.size;
+  $("estadoCambios").innerHTML = n ? `<b>${n}</b> ${n === 1 ? "cambio" : "cambios"} sin guardar` : `${visibles.length} de ${productos.length} modelos`;
+  $("btnGuardar").disabled = n === 0; $("btnDescartar").disabled = n === 0;
+  $("btnCurva").disabled = seleccion.size === 0; $("btnCurva").textContent = seleccion.size ? `Cargar por curva (${seleccion.size})` : "Cargar por curva";
+}
+
+/* anota (o borra) el cambio de una celda */
+function fijar(p, talle, texto) {
+  const v = varianteDe(p, talle), k = clave(p.id, talle);
+  let n = String(texto).trim() === "" ? null : parseInt(String(texto).replace(/\D/g, ""), 10);
+  if (n != null && Number.isNaN(n)) n = null;
+  const original = v ? v.stock : 0;
+  if (n == null || n === original || (!v && n === 0)) { pend.delete(k); return; }
+  n = Math.min(n, maximo);
+  pend.set(k, v ? { tipo: "stock", producto: p.id, variante: v.id, talle: v.talle, antes: v.stock, despues: n }
+                : { tipo: "talle_nuevo", producto: p.id, talle: String(talle).trim(), antes: null, despues: n });
+}
+function refrescarFila(p) {
+  const tr = document.querySelector(`tr[data-fila="${p.id}"]`); if (!tr) return;
+  tr.classList.toggle("fila-cambio", tieneCambios(p)); tr.classList.toggle("sin-stock", totalDe(p) === 0);
+  tr.querySelector("[data-total]").textContent = totalDe(p);
+  tr.querySelectorAll(".celda").forEach((inp) => { const c = pend.get(clave(p.id, inp.dataset.t)); inp.classList.toggle("cambio", !!c); });
+}
+$("cuerpo").addEventListener("input", (e) => {
+  const inp = e.target.closest(".celda"); if (!inp) return;
+  inp.value = inp.value.replace(/\D/g, "").slice(0, 4);
+  const p = productos.find((x) => x.id === Number(inp.dataset.p));
+  fijar(p, inp.dataset.t, inp.value); inp.classList.toggle("cambio", pend.has(clave(p.id, inp.dataset.t)));
+  refrescarFila(p); estadoBarra();
+});
+$("cuerpo").addEventListener("focusin", (e) => { if (e.target.classList.contains("celda")) e.target.select(); });
+$("cuerpo").addEventListener("keydown", (e) => {
+  const inp = e.target.closest(".celda"); if (!inp) return;
+  const lista = [...document.querySelectorAll(`#cuerpo .celda[data-t="${CSS.escape(inp.dataset.t)}"]:not(:disabled)`)];
+  const i = lista.indexOf(inp);
+  if (e.key === "Enter" || e.key === "ArrowDown") { e.preventDefault(); (lista[i + 1] || inp).focus(); }
+  else if (e.key === "ArrowUp") { e.preventDefault(); (lista[i - 1] || inp).focus(); }
+  else if (e.key === "Escape") { const p = productos.find((x) => x.id === Number(inp.dataset.p)); pend.delete(clave(p.id, inp.dataset.t)); const v = varianteDe(p, inp.dataset.t); inp.value = v && v.stock != null ? v.stock : ""; inp.classList.remove("cambio"); refrescarFila(p); estadoBarra(); }
+});
+/* pegar desde Excel: bloque de filas y columnas, desde la celda donde estás */
+$("cuerpo").addEventListener("paste", (e) => {
+  const inp = e.target.closest(".celda"); if (!inp) return;
+  const texto = (e.clipboardData || window.clipboardData).getData("text"); if (!texto) return;
+  const filas = texto.replace(/\r/g, "").replace(/\n+$/, "").split("\n").map((l) => l.split("\t"));
+  if (filas.length === 1 && filas[0].length === 1) return; // un solo valor: pega normal
+  e.preventDefault();
+  const p0 = visibles.findIndex((p) => p.id === Number(inp.dataset.p)), c0 = columnas.indexOf(norm(inp.dataset.t));
+  if (c0 < 0) { aviso("Pegá desde una columna de talle (S, M, L, XL, XXL)."); return; }
+  let n = 0;
+  filas.forEach((cols, i) => cols.forEach((val, j) => {
+    const p = visibles[p0 + i], talle = columnas[c0 + j]; const limpio = val.trim().replace(/\D/g, "");
+    if (!p || !talle || limpio === "") return;
+    const v = varianteDe(p, talle); if (v && v.stock == null) return;
+    fijar(p, talle, limpio); n++;
+  }));
+  pintar(); aviso(n ? `Se pegaron ${n} celdas. Revisalas y guardá.` : "No había números para pegar.");
+});
+$("cuerpo").addEventListener("change", (e) => {
+  const c = e.target.closest("[data-sel]"); if (!c) return;
+  const id = Number(c.dataset.sel); c.checked ? seleccion.add(id) : seleccion.delete(id); estadoBarra();
+  $("selTodos").checked = visibles.length > 0 && visibles.every((p) => seleccion.has(p.id));
+});
+$("cabeza").addEventListener("change", (e) => {
+  if (e.target.id !== "selTodos") return;
+  visibles.forEach((p) => (e.target.checked ? seleccion.add(p.id) : seleccion.delete(p.id))); pintar();
+});
+$("buscar").addEventListener("input", pintar); $("filtro").addEventListener("change", pintar);
+$("btnDescartar").addEventListener("click", () => { if (confirm("¿Descartar todos los cambios sin guardar?")) { pend.clear(); pintar(); } });
+window.addEventListener("beforeunload", (e) => { if (pend.size) { e.preventDefault(); e.returnValue = ""; } });
+
+/* ---------- velos ---------- */
+function abrir(id) { $("velo").classList.add("on"); $(id).classList.add("on"); }
+function cerrar() { $("velo").classList.remove("on"); document.querySelectorAll(".ventana").forEach((v) => v.classList.remove("on")); }
+$("velo").addEventListener("click", cerrar); document.addEventListener("keydown", (e) => { if (e.key === "Escape") cerrar(); });
+document.addEventListener("click", (e) => { if (e.target.closest("[data-cerrar]")) cerrar(); });
+
+/* ---------- curva ---------- */
+function leerCurva(texto) {
+  const curva = {}; let resto = texto.toUpperCase();
+  for (const m of texto.toUpperCase().matchAll(/(XXXL|XXL|XL|XS|S|M|L)\s*[:=xX×]?\s*(\d+)/g)) { curva[m[1]] = (curva[m[1]] || 0) + parseInt(m[2], 10); resto = resto.replace(m[0], " "); }
+  return { curva, sobra: resto.replace(/[\s,;|]+/g, "") };
+}
+function resumenCurva() {
+  const { curva, sobra } = leerCurva($("curvaTexto").value), veces = Math.max(1, parseInt($("curvaVeces").value, 10) || 1);
+  const porModelo = Object.values(curva).reduce((a, b) => a + b, 0) * veces;
+  $("errorCurva").textContent = sobra ? `No entiendo «${sobra}». Escribila así: S1 M2 L3 XL2 XXL1.` : "";
+  $("curvaResumen").textContent = porModelo ? `${porModelo} camisetas por modelo × ${seleccion.size} ${seleccion.size === 1 ? "modelo" : "modelos"} = ${porModelo * seleccion.size} en total.` : "";
+  return { curva, veces, ok: porModelo > 0 && !sobra };
+}
+$("btnCurva").addEventListener("click", () => {
+  $("curvaModelos").textContent = `Se aplica a ${seleccion.size} ${seleccion.size === 1 ? "modelo tildado" : "modelos tildados"}. Después revisás y guardás.`;
+  abrir("ventanaCurva"); $("curvaTexto").focus(); resumenCurva();
+});
+["curvaTexto", "curvaVeces"].forEach((id) => $(id).addEventListener("input", resumenCurva));
+$("btnAplicarCurva").addEventListener("click", () => {
+  const { curva, veces, ok } = resumenCurva(); if (!ok) { if (!$("errorCurva").textContent) $("errorCurva").textContent = "Escribí la curva, por ejemplo: S1 M2 L3 XL2 XXL1."; return; }
+  const sumar = $("curvaModo").value === "sumar";
+  productos.filter((p) => seleccion.has(p.id)).forEach((p) => Object.entries(curva).forEach(([talle, n]) => {
+    const v = varianteDe(p, talle); if (v && v.stock == null) return;
+    const base = sumar ? (valorMostrado(p, talle) || 0) : 0; fijar(p, talle, base + n * veces);
+  }));
+  cerrar(); pintar(); aviso("Curva aplicada. Revisá las celdas en mostaza y guardá.");
+});
+
+/* ---------- guardar ---------- */
+let enviando = false, modoRecarga = false;
+$("btnGuardar").addEventListener("click", () => {
+  const cambios = [...pend.values()]; const nombre = (id) => productos.find((p) => p.id === id).nombre;
+  const delta = cambios.reduce((a, c) => a + c.despues - (c.antes || 0), 0);
+  $("revisionResumen").textContent = `${cambios.length} ${cambios.length === 1 ? "cambio" : "cambios"} · ${delta >= 0 ? "+" : ""}${delta} camisetas en total. Se guardan directo en Tiendanube.`;
+  $("revisionLista").innerHTML = cambios.map((c) => `<div><span>${esc(nombre(c.producto))} · <b>${esc(c.talle)}</b>${c.tipo === "talle_nuevo" ? " (talle nuevo)" : ""}</span><span>${c.antes == null ? "—" : c.antes} <span class="flecha">→</span> <b>${c.despues}</b></span></div>`).join("");
+  $("revisionError").hidden = true; modoRecarga = false; $("btnConfirmar").textContent = "Guardar en Tiendanube"; $("btnConfirmar").disabled = false; abrir("ventanaRevision");
+});
+$("btnConfirmar").addEventListener("click", async () => {
+  if (modoRecarga) { modoRecarga = false; cerrar(); await cargarPlanilla(); return; }
+  if (enviando) return; enviando = true; $("btnConfirmar").disabled = true; $("btnConfirmar").textContent = "Guardando...";
+  try {
+    const r = await api("/stock/aplicar", { metodo: "POST", cuerpo: { cambios: [...pend.values()].map(({ tipo, producto, variante, talle, antes, despues }) => ({ tipo, producto, variante, talle, antes, despues })) } });
+    cerrar(); aviso(`Guardado: ${r.aplicados} de stock${r.creados ? ` y ${r.creados} talles nuevos` : ""}.`); await cargarPlanilla();
+  } catch (e) {
+    const caja = $("revisionError"); caja.hidden = false;
+    caja.innerHTML = `<b>${esc(e.message)}</b>${e.conflictos && e.conflictos.length ? "<ul>" + e.conflictos.map((c) => `<li>${esc(c.modelo || "")} ${c.talle ? "· " + esc(c.talle) : ""}: ${esc(c.motivo)}${c.actual != null ? ` (había ${c.esperado}, ahora hay ${c.actual})` : ""}</li>`).join("") + "</ul><p class=\"ayuda\">Recargá la planilla y volvé a cargar los cambios.</p>" : ""}`;
+    if (e.estado === 409) { modoRecarga = true; $("btnConfirmar").textContent = "Recargar planilla"; $("btnConfirmar").disabled = false; enviando = false; return; }
+    $("btnConfirmar").disabled = false;
+  }
+  enviando = false; $("btnConfirmar").textContent = "Guardar en Tiendanube";
+});
+
+/* ---------- historial ---------- */
+async function cargarHistorial() {
+  const caja = $("listaHistorial"); caja.innerHTML = '<p class="ayuda">Cargando...</p>';
+  try {
+    const lotes = await api("/historial");
+    caja.innerHTML = lotes.length ? lotes.map((l) => {
+      const f = new Date(l.fecha).toLocaleString("es-AR", { dateStyle: "medium", timeStyle: "short" });
+      const det = l.entradas.slice().reverse().map((e) => e.accion === "producto_nuevo"
+        ? `<div>Modelo nuevo: ${esc(e.producto)} (${esc(e.talle)})</div>`
+        : `<div>${esc(e.producto)} · ${esc(e.talle)}: ${e.antes == null ? "—" : e.antes} <span class="flecha">→</span> ${e.despues}${e.accion === "talle_nuevo" ? " (talle nuevo)" : ""}</div>`).join("");
+      return `<article class="lote"><header><b>${esc(f)}</b><span>${esc(l.usuario)}</span><span>${l.entradas.length} ${l.entradas.length === 1 ? "cambio" : "cambios"}</span><span class="espacio"></span>
+        ${l.se_puede_deshacer ? `<button class="btn chico" data-deshacer="${esc(l.lote)}">Deshacer</button>` : (l.deshecho ? '<span class="deshecho">Deshecho</span>' : "")}</header><div class="detalle">${det}</div></article>`;
+    }).join("") : '<p class="ayuda">Todavía no hay cambios guardados.</p>';
+  } catch (e) { caja.innerHTML = `<p class="ayuda">No se pudo cargar: ${esc(e.message)}</p>`; }
+}
+$("listaHistorial").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-deshacer]"); if (!b) return;
+  if (!confirm("¿Devolver el stock de ese guardado a como estaba?")) return;
+  b.disabled = true;
+  try { await api(`/historial/${b.dataset.deshacer}/deshacer`, { metodo: "POST" }); aviso("Deshecho. El stock volvió a como estaba."); }
+  catch (err) { alert(err.message + (err.conflictos && err.conflictos.length ? "\n\n" + err.conflictos.map((c) => `${c.modelo || ""} ${c.talle || ""}: ${c.motivo}`).join("\n") : "")); }
+  cargarHistorial();
+});
+
+/* ---------- modelo nuevo ---------- */
+let fotosNuevas = [], categoriasCargadas = false, tallesExtra = [];
+function prepararNuevo() {
+  if (!$("nTalles").children.length) pintarTallesNuevo();
+  if (!categoriasCargadas) api("/categorias").then((cs) => { categoriasCargadas = true; $("nCategorias").innerHTML = cs.map((c) => `<label><input type="checkbox" value="${c.id}"> ${esc(c.nombre)}</label>`).join(""); }).catch((e) => ($("nCategorias").textContent = "No se pudieron cargar: " + e.message));
+}
+function pintarTallesNuevo() {
+  const previos = {}; $("nTalles").querySelectorAll("input").forEach((i) => (previos[i.dataset.t] = i.value));
+  $("nTalles").innerHTML = ["S", "M", "L", "XL", "XXL", ...tallesExtra].map((t) => `<label class="talle-nuevo">${esc(t)}<input data-t="${esc(t)}" inputmode="numeric" maxlength="4" placeholder="0" value="${esc(previos[t] || "")}"></label>`).join("");
+}
+$("nAgregarTalle").addEventListener("click", () => { const t = norm($("nTalleExtra").value); if (t && !["S", "M", "L", "XL", "XXL", ...tallesExtra].includes(t)) { tallesExtra.push(t); pintarTallesNuevo(); } $("nTalleExtra").value = ""; });
+function reducirFoto(archivo) {
+  return new Promise((ok, mal) => {
+    const lector = new FileReader();
+    lector.onerror = () => mal(new Error("No se pudo leer " + archivo.name));
+    lector.onload = () => { const img = new Image(); img.onerror = () => mal(new Error(archivo.name + " no es una imagen válida"));
+      img.onload = () => { const k = Math.min(1, 1600 / Math.max(img.width, img.height)), c = document.createElement("canvas"); c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height); ok({ nombre: archivo.name.replace(/\.[^.]+$/, "") + ".jpg", datos: c.toDataURL("image/jpeg", 0.88) }); };
+      img.src = lector.result; };
+    lector.readAsDataURL(archivo);
+  });
+}
+$("nFotos").addEventListener("change", async (e) => {
+  $("errorNuevo").textContent = "";
+  try { for (const f of [...e.target.files].slice(0, 4 - fotosNuevas.length)) fotosNuevas.push(await reducirFoto(f)); } catch (err) { $("errorNuevo").textContent = err.message; }
+  e.target.value = ""; pintarPrevias();
+});
+function pintarPrevias() { $("nPrevias").innerHTML = fotosNuevas.map((f, i) => `<figure><img src="${f.datos}" alt=""><button type="button" data-quitar="${i}" aria-label="Quitar foto">×</button></figure>`).join(""); }
+$("nPrevias").addEventListener("click", (e) => { const b = e.target.closest("[data-quitar]"); if (b) { fotosNuevas.splice(Number(b.dataset.quitar), 1); pintarPrevias(); } });
+$("formNuevo").addEventListener("submit", async (e) => {
+  e.preventDefault(); $("errorNuevo").textContent = ""; $("errorNuevo").className = "mensaje";
+  const talles = {}; $("nTalles").querySelectorAll("input").forEach((i) => { const n = parseInt(i.value.replace(/\D/g, ""), 10); if (!Number.isNaN(n)) talles[i.dataset.t] = n; });
+  if (!Object.keys(talles).length) { $("errorNuevo").textContent = "Cargá el stock de al menos un talle (puede ser 0)."; return; }
+  if (!fotosNuevas.length && !confirm("No cargaste fotos. El modelo no se va a ver en la web mayorista hasta que tenga una. ¿Crear igual?")) return;
+  $("btnCrear").disabled = true;
+  try {
+    const r = await api("/productos", { metodo: "POST", cuerpo: { nombre: $("nNombre").value, precio: Number($("nPrecio").value), talles, publicado: $("nPublicar").checked, fotos: fotosNuevas,
+      categorias: [...$("nCategorias").querySelectorAll("input:checked")].map((i) => Number(i.value)) } });
+    $("errorNuevo").className = "mensaje ok"; $("errorNuevo").textContent = `Creado: ${r.nombre}. ${r.publicado ? "Ya está publicado." : "Quedó oculto: publicalo desde Tiendanube cuando esté listo."}`;
+    $("formNuevo").reset(); fotosNuevas = []; pintarPrevias(); pintarTallesNuevo();
+  } catch (err) { $("errorNuevo").textContent = err.message; }
+  finally { $("btnCrear").disabled = false; }
+});
+
+arrancar();
+</script>
+</body>
+</html>

@@ -17,7 +17,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "mayorista"))
 
-import servidor  # noqa: E402
+import sitio as servidor  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
 FOTO = "https://acdn-us.mitiendanube.com/stores/1/products/boca-abc-1024-1024.png"
@@ -44,7 +44,7 @@ def producto(
 @pytest.fixture(autouse=True)
 def cache_limpia():
     servidor._cache.update(t=0.0, catalogo=None, imagenes={})
-    servidor._fotos.clear()
+    servidor.tn._fotos.clear()
     yield
 
 

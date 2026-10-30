@@ -15,7 +15,7 @@ RUN apt-get update \
 COPY requirements.txt ./
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY servidor.py ./
+COPY *.py ./
 COPY static/ ./static/
 
 RUN useradd --create-home mayorista && chown -R mayorista:mayorista /app
@@ -24,4 +24,4 @@ USER mayorista
 ENV PUERTO=8000
 EXPOSE 8000
 
-CMD ["python", "servidor.py"]
+CMD ["python", "sitio.py"]

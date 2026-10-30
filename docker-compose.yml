@@ -129,17 +129,27 @@ services:
       start_period: 40s
 
   mayorista:
-    # La web mayorista (carrito que manda el pedido por WhatsApp). Lee el stock
-    # y los talles de Tiendanube; no guarda nada, así que no usa Postgres.
+    # La web mayorista (carrito que manda el pedido por WhatsApp) y su panel de
+    # administración en /admin. El stock y los talles son los de Tiendanube; en
+    # Postgres solo se guarda el historial de cambios del panel.
     build:
       context: ./mayorista
       dockerfile: Dockerfile
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
     expose:
       - "8000"
     environment:
       TIENDANUBE_STORE_ID: ${TIENDANUBE_STORE_ID:-}
       TIENDANUBE_ACCESS_TOKEN: ${TIENDANUBE_ACCESS_TOKEN:-}
+      POSTGRES_DSN: postgresql://${POSTGRES_USER:-tribuneros}:${POSTGRES_PASSWORD}@postgres:5432/agente
+      # El login del panel (/admin). Sin las tres, el panel queda apagado.
+      # SESION_SECRETO: al menos 24 caracteres al azar (firma las cookies).
+      ADMIN_USUARIO: ${ADMIN_USUARIO:-}
+      ADMIN_CLAVE: ${ADMIN_CLAVE:-}
+      SESION_SECRETO: ${SESION_SECRETO:-}
       # Número al que llega el pedido (con código de país, sin + ni espacios).
       MAYORISTA_WHATSAPP: ${MAYORISTA_WHATSAPP:-5491178173282}
       # Cada cuánto se vuelve a leer Tiendanube.
